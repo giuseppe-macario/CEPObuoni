@@ -35,13 +35,6 @@ SOGLIA_CENA   = time(20, 30)   # tutti i giorni: >= 20:30
 DATE_RE   = re.compile(r"(\d{2}/\d{2}/\d{4})")
 ORARIO_RE = re.compile(r"(\d{1,2}[:.,]\d{2})")
 
-CAUSALI_DA_OMETTERE = {"comando e logistica"}
-def _norm_causale(s: str) -> str: return re.sub(r"\s+", " ", (s or "")).strip().casefold()
-def _is_recupero_compensativo(s: str) -> bool:
-    return _norm_causale(s) == "recupero compensativo"
-
-DEBUG = False
-
 # ------------------ Validazione PDF ------------------
 def _estrai_righe_testo(pdf):
     righe = []
@@ -266,22 +259,20 @@ def main():
             for raw_line in text.splitlines():
                 line = raw_line.strip()
                 parsed = parse_line(line)
-                if DEBUG and DATE_RE.search(line):
-                    print("[DEBUG]", line, "->",
-                          [m.group(1) for m in ORARIO_RE.finditer(line)],
-                          "parsed:", parsed)
                 if not parsed:
                     continue
                 data_str, ora_ing, ora_usc, causale = parsed
-                if _norm_causale(causale) in CAUSALI_DA_OMETTERE:
+                if causale == "SERVIZIO ISOLATO":
+                    continue
+                if causale == "COMANDO E LOGISTICA":
                     causale = ""
                 tipo = calcola_pasto(data_str, ora_usc)
                 if not tipo:
                     continue
                 wd_it = giorno_settimana(data_str)
                 entrata_str = ora_ing.strftime("%H:%M")
-                if _is_recupero_compensativo(causale) and ora_ing.hour == 7 and ora_ing.minute == 30:
-                    # mostra *07:30 in caso di RECUPERO COMPENSATIVO
+                if causale == "RECUPERO COMPENSATIVO" and ora_ing.hour == 7 and ora_ing.minute == 30:
+                    # aggiungi asterisco in caso di RECUPERO COMPENSATIVO all'entrata
                     entrata_str = "*07:30"
                 risultati.append((
                     f"{data_str} ({wd_it})",
